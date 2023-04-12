@@ -20,19 +20,89 @@ pub struct Board {
 }
 
 impl Board {
+    /// Creates a new board from given optional dimensions and dice faces
+    pub fn new(
+        width: Option<u8>,
+        height: Option<u8>,
+        dice_faces: Vec<String>,
+    ) -> Result<Self, String> {
+        let x;
+        let y;
+
+        // Calculate board dimensions
+        if let Some(width) = width {
+            x = width as usize;
+
+            if let Some(height) = height {
+                y = height as usize;
+            } else {
+                let calc_y = dice_faces.len() as f32 / x as f32;
+
+                if calc_y.fract() == 0.0 {
+                    y = calc_y as usize;
+                } else {
+                    y = 0;
+                    Err("Unable to calculate board height from width and number of dice faces")?
+                }
+            }
+        } else if let Some(height) = height {
+            y = height as usize;
+
+            let calc_x = dice_faces.len() as f32 / y as f32;
+
+            if calc_x.fract() == 0.0 {
+                x = calc_x as usize;
+            } else {
+                x = 0;
+                Err("Unable to calculate board width from height and number of dice faces")?
+            }
+        } else {
+            let calc_dim = (dice_faces.len() as f32).sqrt();
+
+            if calc_dim.fract() == 0.0 {
+                x = calc_dim as usize;
+                y = calc_dim as usize;
+            } else {
+                x = 0;
+                y = 0;
+                Err("Unable to calculate board size from number of dice faces")?
+            }
+        }
+
+        // Get flat vector of dice faces
+        let faces_flat = dice_faces
+            .iter()
+            .map(|f| DiceFace::from_string(f))
+            .collect::<Result<Vec<_>, String>>()?;
+
+        // Build 2-d vector of dice faces
+        let faces = faces_flat
+            .chunks(x)
+            .map(|row| row.to_vec())
+            .collect::<Vec<_>>();
+
+        // Build dictionary elements vector
+        let dict_ents = Self::build_dict_ents(&faces);
+
+        Ok(Self {
+            x,
+            y,
+            faces,
+            dict_ents,
+        })
+    }
+
     /// Creates a new random Boggle board for the given game type
     pub fn new_random(game_type: GameType) -> Board {
         let (x, y) = game_type.layout();
         let mut dice = game_type.dice();
 
         let mut faces = Vec::with_capacity(y);
-        let mut dict_ents = Vec::with_capacity(y);
 
         let mut rng = rand::thread_rng();
 
         for _ in 0..y {
             let mut faces_row = Vec::with_capacity(x);
-            let mut dict_ents_row = Vec::with_capacity(x);
 
             for _ in 0..x {
                 // Choose a dice
@@ -43,20 +113,15 @@ impl Board {
                 let face_elem = rng.gen_range(0..6);
                 let face = dice.face(face_elem);
 
-                // Add to dictionary entries
-                dict_ents_row.push(match face {
-                    DiceFace::Letter(c) => vec![uchar_to_elem_u8(c)],
-                    DiceFace::Ligature(str) => str.chars().map(uchar_to_elem_u8).collect(),
-                    DiceFace::Stop => vec![],
-                });
-
                 // Add to faces
                 faces_row.push(face);
             }
 
             faces.push(faces_row);
-            dict_ents.push(dict_ents_row);
         }
+
+        // Build dictionary elements vector
+        let dict_ents = Self::build_dict_ents(&faces);
 
         Board {
             x,
@@ -68,9 +133,20 @@ impl Board {
 
     /// Prints the Boggle board
     pub fn print(&self) {
+        let longest = self
+            .faces
+            .iter()
+            .flatten()
+            .map(|f| match f {
+                DiceFace::Ligature(s) => s.len(),
+                _ => 1,
+            })
+            .max()
+            .unwrap_or(1);
+
         for y in 0..self.y {
             for x in 0..self.x {
-                print!(" {}", self.faces[y][x]);
+                print!(" {:<longest$}", self.faces[y][x]);
             }
             println!()
         }
@@ -122,5 +198,21 @@ impl Board {
         }
 
         result
+    }
+
+    /// Builds a 3d vector of dictionary entries from a 2d vector of dice faces
+    fn build_dict_ents(faces: &[Vec<DiceFace>]) -> Vec<Vec<Vec<u8>>> {
+        faces
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|face| match face {
+                        DiceFace::Letter(c) => vec![uchar_to_elem_u8(*c)],
+                        DiceFace::Ligature(str) => str.chars().map(uchar_to_elem_u8).collect(),
+                        DiceFace::Stop => vec![],
+                    })
+                    .collect()
+            })
+            .collect()
     }
 }

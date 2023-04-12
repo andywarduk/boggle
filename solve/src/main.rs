@@ -4,7 +4,6 @@
 
 mod results;
 
-use std::io;
 use std::path::Path;
 use std::time::Instant;
 
@@ -23,6 +22,14 @@ struct Args {
     /// Game type
     #[clap(short = 'g', long = "game", default_value = "classic")]
     game_type: ArgsGameType,
+
+    /// Board width
+    #[clap(short = 'x', long = "width")]
+    width: Option<u8>,
+
+    /// Board height
+    #[clap(short = 'y', long = "height")]
+    height: Option<u8>,
 
     /// Word list file
     #[clap(
@@ -43,6 +50,9 @@ struct Args {
     /// Debug output
     #[clap(long = "debug")]
     debug: bool,
+
+    /// Dice faces to use. If none given a random board is generated for the game type.
+    dice_faces: Vec<String>,
 }
 
 #[derive(ValueEnum, Debug, Clone, Default)]
@@ -63,7 +73,7 @@ impl std::fmt::Display for ArgsGameType {
     }
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
     let args = Args::parse();
 
@@ -86,19 +96,23 @@ fn main() -> io::Result<()> {
 
     let dictionary = Dictionary::new_from_file(&args.dictionary_file, size, args.verbose)?;
 
-    // Convert arg game type to game type
-    let game_type = match args.game_type {
-        ArgsGameType::Classic => GameType::Classic,
-        ArgsGameType::New => GameType::New,
-        ArgsGameType::BigOriginal => GameType::BigOriginal,
-        ArgsGameType::BigChallenge => GameType::BigChallenge,
-        ArgsGameType::BigDeluxe => GameType::BigDeluxe,
-        ArgsGameType::Big2012 => GameType::Big2012,
-        ArgsGameType::SuperBig => GameType::SuperBig,
-    };
+    let board = if args.dice_faces.is_empty() {
+        // Convert arg game type to game type
+        let game_type = match args.game_type {
+            ArgsGameType::Classic => GameType::Classic,
+            ArgsGameType::New => GameType::New,
+            ArgsGameType::BigOriginal => GameType::BigOriginal,
+            ArgsGameType::BigChallenge => GameType::BigChallenge,
+            ArgsGameType::BigDeluxe => GameType::BigDeluxe,
+            ArgsGameType::Big2012 => GameType::Big2012,
+            ArgsGameType::SuperBig => GameType::SuperBig,
+        };
 
-    // Generate board
-    let board = Board::new_random(game_type);
+        // Generate board
+        Board::new_random(game_type)
+    } else {
+        Board::new(args.width, args.height, args.dice_faces)?
+    };
 
     // Print board
     println!("Board:");
