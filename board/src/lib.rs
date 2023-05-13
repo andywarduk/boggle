@@ -2,7 +2,7 @@
 
 //! Boggle board structures
 
-use dictionary::uchar_to_elem_u8;
+use dictionary::Dictionary;
 use rand::Rng;
 
 mod dice;
@@ -207,8 +207,10 @@ impl Board {
             .map(|row| {
                 row.iter()
                     .map(|face| match face {
-                        DiceFace::Letter(c) => vec![uchar_to_elem_u8(*c)],
-                        DiceFace::Ligature(str) => str.chars().map(uchar_to_elem_u8).collect(),
+                        DiceFace::Letter(c) => vec![Dictionary::uchar_to_elem(*c)],
+                        DiceFace::Ligature(str) => {
+                            str.chars().map(Dictionary::uchar_to_elem).collect()
+                        }
                         DiceFace::Stop => vec![],
                     })
                     .collect()

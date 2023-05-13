@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use board::{Board, DiceFace};
-use dictionary::{elem_u8_to_uchar, Dictionary};
+use dictionary::Dictionary;
 
 /// Arguments for the Boggle solver
 pub struct SolverArgs<'a> {
@@ -105,7 +105,7 @@ fn find_words_rec(
 fn chosen_string(chosen: &[u8]) -> String {
     chosen
         .iter()
-        .map(|e| elem_u8_to_uchar(*e))
+        .map(|e| Dictionary::elem_to_uchar(*e))
         .collect::<String>()
 }
 

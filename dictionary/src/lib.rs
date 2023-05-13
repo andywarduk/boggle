@@ -11,6 +11,9 @@ use std::time::Instant;
 use flate2::bufread::GzDecoder;
 use numformat::NumFormat;
 
+/// Array of element numbers of the next dictionary level
+type LetterVec = [u32; 27];
+
 /// Dictionary structure
 pub struct Dictionary {
     words: usize,
@@ -23,7 +26,7 @@ impl Dictionary {
         let path_buf = PathBuf::from(file);
 
         if verbose {
-            println!("Loading words from file {}", file_spec(&path_buf)?);
+            println!("Loading words from file {}", Self::file_spec(&path_buf)?);
         }
 
         // Create buf reader for the file
@@ -128,7 +131,7 @@ impl Dictionary {
             }
 
             // Make sure word consists of all lower case ascii characters
-            if !is_ascii_lower(&line) {
+            if !Self::is_ascii_lower(&line) {
                 wrong_case += 1;
                 continue;
             }
@@ -139,7 +142,7 @@ impl Dictionary {
             let mut cur_elem = 0;
 
             for c in line.chars() {
-                let letter = lchar_to_elem(c);
+                let letter: usize = Dictionary::lchar_to_elem(c);
 
                 cur_elem = if tree[cur_elem][letter] == 0 {
                     tree.push(empty);
@@ -214,6 +217,53 @@ impl Dictionary {
     pub fn lookup_elem_letter_num(&self, elem: u32, letter: u8) -> u32 {
         self.tree[elem as usize][letter as usize]
     }
+
+    #[inline]
+    /// Converts a lower case character into a dictionary entry index (usize)
+    fn lchar_to_elem<T>(c: char) -> T
+    where
+        T: std::convert::From<u8>,
+    {
+        (c as u8 - (b'a' - 1)).into()
+    }
+
+    #[inline]
+    /// Converts an upper case character into a dictionary entry index (u8)
+    pub fn uchar_to_elem<T>(c: char) -> T
+    where
+        T: std::convert::From<u8>,
+    {
+        (c as u8 - (b'A' - 1)).into()
+    }
+
+    #[inline]
+    /// Converts dictionary entry index (u8) into an upper case character
+    pub fn elem_to_uchar(e: u8) -> char {
+        (e + b'A' - 1) as char
+    }
+
+    /// Follows symlinks in a path returning the followed paths as a string
+    fn file_spec(path: &PathBuf) -> io::Result<String> {
+        let meta = symlink_metadata(path)?;
+
+        if meta.is_symlink() {
+            let target = read_link(path)?;
+
+            Ok(format!(
+                "{} -> {}",
+                path.to_string_lossy(),
+                Self::file_spec(&target)?
+            ))
+        } else {
+            Ok(format!("{}", path.to_string_lossy()))
+        }
+    }
+
+    #[inline]
+    /// Returns true if the passed string is all lower case
+    fn is_ascii_lower(s: &str) -> bool {
+        s.chars().all(|c| c.is_ascii_lowercase())
+    }
 }
 
 /// Word size constraints to use when loading a dictionary
@@ -241,49 +291,6 @@ impl Default for WordSizeConstraint {
             max: usize::MAX,
         }
     }
-}
-
-/// Array of element numbers of the next dictionary level
-type LetterVec = [u32; 27];
-
-fn file_spec(path: &PathBuf) -> io::Result<String> {
-    let meta = symlink_metadata(path)?;
-
-    if meta.is_symlink() {
-        let target = read_link(path)?;
-
-        Ok(format!(
-            "{} -> {}",
-            path.to_string_lossy(),
-            file_spec(&target)?
-        ))
-    } else {
-        Ok(format!("{}", path.to_string_lossy()))
-    }
-}
-
-#[inline]
-/// Converts an lower case character into a dictionary entry index (usize)
-fn lchar_to_elem(c: char) -> usize {
-    (c as u8 - (b'a' - 1)) as usize
-}
-
-#[inline]
-/// Converts an upper case character into a dictionary entry index (u8)
-pub fn uchar_to_elem_u8(c: char) -> u8 {
-    c as u8 - (b'A' - 1)
-}
-
-#[inline]
-/// Converts dictionary entry index (u8) into an upper case character
-pub fn elem_u8_to_uchar(e: u8) -> char {
-    (e + b'A' - 1) as char
-}
-
-#[inline]
-/// Returns true if the passed string is all lower case
-fn is_ascii_lower(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_lowercase())
 }
 
 #[cfg(test)]
@@ -322,19 +329,19 @@ mod tests {
         assert_eq!(dictionary.tree_mem_usage(), 5 * 27 * 4);
 
         assert_eq!(
-            dictionary.lookup_elem_letter_num(0, uchar_to_elem_u8('R')),
+            dictionary.lookup_elem_letter_num(0, Dictionary::uchar_to_elem('R')),
             1
         );
         assert_eq!(
-            dictionary.lookup_elem_letter_num(1, uchar_to_elem_u8('U')),
+            dictionary.lookup_elem_letter_num(1, Dictionary::uchar_to_elem('U')),
             2
         );
         assert_eq!(
-            dictionary.lookup_elem_letter_num(2, uchar_to_elem_u8('S')),
+            dictionary.lookup_elem_letter_num(2, Dictionary::uchar_to_elem('S')),
             3
         );
         assert_eq!(
-            dictionary.lookup_elem_letter_num(3, uchar_to_elem_u8('T')),
+            dictionary.lookup_elem_letter_num(3, Dictionary::uchar_to_elem('T')),
             4
         );
         assert!(dictionary.elem_ends_word(4));
@@ -364,24 +371,24 @@ mod tests {
         assert_eq!(dictionary.tree_mem_usage(), 6 * 4 * 27);
 
         assert_eq!(
-            dictionary.lookup_elem_letter_num(0, uchar_to_elem_u8('R')),
+            dictionary.lookup_elem_letter_num(0, Dictionary::uchar_to_elem('R')),
             1
         );
         assert_eq!(
-            dictionary.lookup_elem_letter_num(1, uchar_to_elem_u8('U')),
+            dictionary.lookup_elem_letter_num(1, Dictionary::uchar_to_elem('U')),
             2
         );
         assert_eq!(
-            dictionary.lookup_elem_letter_num(2, uchar_to_elem_u8('S')),
+            dictionary.lookup_elem_letter_num(2, Dictionary::uchar_to_elem('S')),
             3
         );
         assert_eq!(
-            dictionary.lookup_elem_letter_num(3, uchar_to_elem_u8('T')),
+            dictionary.lookup_elem_letter_num(3, Dictionary::uchar_to_elem('T')),
             4
         );
         assert!(dictionary.elem_ends_word(4));
         assert_eq!(
-            dictionary.lookup_elem_letter_num(4, uchar_to_elem_u8('Y')),
+            dictionary.lookup_elem_letter_num(4, Dictionary::uchar_to_elem('Y')),
             5
         );
         assert!(dictionary.elem_ends_word(5));
