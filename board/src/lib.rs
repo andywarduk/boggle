@@ -3,7 +3,7 @@
 //! Boggle board structures
 
 use dictionary::Dictionary;
-use rand::Rng;
+use rand::RngExt;
 
 mod dice;
 mod gametype;
@@ -99,18 +99,18 @@ impl Board {
 
         let mut faces = Vec::with_capacity(y);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..y {
             let mut faces_row = Vec::with_capacity(x);
 
             for _ in 0..x {
                 // Choose a dice
-                let dice_elem = rng.gen_range(0..dice.len());
+                let dice_elem = rng.random_range(0..dice.len());
                 let dice = dice.swap_remove(dice_elem);
 
                 // Choose a face
-                let face_elem = rng.gen_range(0..6);
+                let face_elem = rng.random_range(0..6);
                 let face = dice.face(face_elem);
 
                 // Add to faces
